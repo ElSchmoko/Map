@@ -1,0 +1,11 @@
+[
+  {
+    "name": "test",
+    "address": "Normannenstraße 40",
+    "tags": [
+      "test"
+    ],
+    "lat": 52.516311,
+    "lon": 13.4813142
+  }
+]

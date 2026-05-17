@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Erzbistum Berlin Map</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            /* Pure White Theme */
+            --bg-color: #ffffff;
+            --panel-bg: #ffffff;
+            --shadow-light: #ffffff;
+            --shadow-dark: #b8c2d1;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --accent-red: #991b1b;
+            --accent-red-hover: #b91c1c;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        .svg-defs {
+            position: absolute;
+            width: 0;
+            height: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            background: var(--bg-color);
+        }
+
+        .sidebar {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            width: 380px;
+            max-height: calc(100vh - 48px);
+            overflow-y: auto;
+            z-index: 1000;
+            background: var(--panel-bg);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 10px 10px 30px rgba(184, 194, 209, 0.4), -10px -10px 30px #ffffff;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .sidebar::-webkit-scrollbar { width: 8px; }
+        .sidebar::-webkit-scrollbar-track { background: var(--bg-color); border-radius: 10px; }
+        .sidebar::-webkit-scrollbar-thumb { 
+            background: #cbd5e1; 
+            border-radius: 10px; 
+            border: 2px solid var(--bg-color);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .header h1 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+            color: var(--text-main);
+            letter-spacing: -0.02em;
+        }
+
+        .header p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+
+        .stats-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-box {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--accent-red);
+        }
+
+        .form-section {
+            margin-bottom: 24px;
+            padding-top: 20px;
+            border-top: 2px solid #f1f5f9;
+        }
+
+        .form-section h3 {
+            font-size: 1.05rem;
+            margin-bottom: 16px;
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        .input-group { margin-bottom: 16px; }
+
+        .input-group label {
+            display: block; font-size: 0.75rem; color: var(--text-muted);
+            margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;
+            font-weight: 600;
+            padding-left: 4px;
+        }
+
+        .input-group input {
+            width: 100%; 
+            padding: 12px 16px; 
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            color: var(--text-main); 
+            font-family: 'Inter', sans-serif; 
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .input-group input:focus {
+            outline: none; 
+            border-color: var(--accent-red);
+            box-shadow: 0 0 0 3px rgba(153, 27, 27, 0.1);
+        }
+
+        button {
+            width: 100%; 
+            padding: 14px; 
+            background: var(--bg-color); 
+            color: var(--accent-red);
+            border: 1px solid #e2e8f0; 
+            border-radius: 8px; 
+            font-weight: 700; 
+            font-size: 0.95rem;
+            cursor: pointer; 
+            box-shadow: 4px 4px 10px rgba(184, 194, 209, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        button:hover { 
+            color: var(--accent-red-hover);
+            border-color: #cbd5e1;
+            box-shadow: 6px 6px 14px rgba(184, 194, 209, 0.4);
+        }
+        
+        button:active { 
+            transform: translateY(1px);
+            box-shadow: 2px 2px 5px rgba(184, 194, 209, 0.2);
+        }
+        
+        button:disabled { 
+            color: var(--text-muted); 
+            cursor: not-allowed; 
+            box-shadow: none;
+        }
+
+        .filter-section { 
+            padding-top: 20px;
+            border-top: 2px solid #f1f5f9;
+        }
+        .filter-section h3 { 
+            font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; 
+            text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;
+        }
+        .tags-container { display: flex; flex-wrap: wrap; gap: 12px; }
+        
+        .tag-pill {
+            padding: 6px 14px; 
+            border-radius: 20px; 
+            font-size: 0.8rem; 
+            font-weight: 600;
+            cursor: pointer; 
+            background: #f8fafc; 
+            border: 1px solid #e2e8f0;
+            color: var(--text-muted); 
+            transition: all 0.2s ease;
+        }
+        
+        .tag-pill:hover { 
+            color: var(--accent-red); 
+            border-color: #cbd5e1;
+        }
+        
+        .tag-pill.active { 
+            background: var(--accent-red);
+            color: white;
+            border-color: var(--accent-red);
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-color);
+            color: var(--text-main);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(184, 194, 209, 0.5);
+            border: 1px solid #f1f5f9;
+        }
+        
+        .leaflet-popup-tip { background: var(--bg-color); }
+
+        .leaflet-popup-content {
+            margin: 16px;
+            font-size: 0.95rem;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .popup-tags { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+        .popup-tag { 
+            font-size: 0.7rem; 
+            font-weight: 600;
+            padding: 4px 8px; 
+            border-radius: 6px; 
+            background: #f1f5f9;
+            color: var(--accent-red); 
+        }
+
+        .custom-marker {
+            background: var(--bg-color);
+            border-radius: 50%;
+            box-shadow: 0 4px 8px rgba(184, 194, 209, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+        .custom-marker::after {
+            content: '';
+            width: 10px;
+            height: 10px;
+            background: var(--accent-red);
+            border-radius: 50%;
+        }
+        .custom-marker:hover { transform: scale(1.15); }
+
+        /* Layers */
+        .neumorphic-shadow-layer {
+            filter: url(#raised-shadow);
+            pointer-events: none;
+        }
+        
+        .active-parish-shadow {
+            filter: url(#raised-active-shadow);
+            pointer-events: none;
+        }
+
+        .pfarrei-layer {
+            transition: fill-opacity 0.2s ease, stroke 0.2s ease;
+        }
+
+        .leaflet-control-zoom {
+            box-shadow: 0 4px 10px rgba(184, 194, 209, 0.4) !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+            overflow: hidden;
+        }
+        .leaflet-control-zoom a {
+            background: var(--bg-color) !important;
+            color: var(--text-main) !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+        }
+        .leaflet-control-zoom a:hover {
+            color: var(--accent-red) !important;
+            background: #f8fafc !important;
+        }
+        
+        .loading-overlay {
+            position: absolute; inset: 0; background: var(--bg-color); z-index: 2000;
+            display: flex; justify-content: center; align-items: center; transition: opacity 0.5s ease;
+        }
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid #e2e8f0;
+            border-top-color: var(--accent-red); border-radius: 50%; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <svg class="svg-defs">
+        <defs>
+            <!-- Shadow for the overall Diocese border -->
+            <filter id="raised-shadow" x="-30%" y="-30%" width="160%" height="160%">
+                <feDropShadow dx="8" dy="8" stdDeviation="12" flood-color="#a3b1c6" flood-opacity="0.5" result="dark"/>
+                <!-- We omit the white shadow because background is pure white -->
+                <feMerge result="shadows">
+                    <feMergeNode in="dark"/>
+                </feMerge>
+                <!-- operator="out" cuts the original polygon out of the shadow, leaving ONLY the shadow outside -->
+                <feComposite in="shadows" in2="SourceGraphic" operator="out"/>
+            </filter>
+
+            <!-- Shadow for the active highlighted parish -->
+            <filter id="raised-active-shadow" x="-50%" y="-50%" width="200%" height="200%">
+                <!-- Strong dark outer shadow -->
+                <feDropShadow dx="12" dy="12" stdDeviation="16" flood-color="#7e8d9f" flood-opacity="0.6" result="dark"/>
+                <feMerge result="shadows">
+                    <feMergeNode in="dark"/>
+                </feMerge>
+                <!-- Same trick: removes the inside so basemap shows perfectly, leaves strong outside shadow -->
+                <feComposite in="shadows" in2="SourceGraphic" operator="out"/>
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="sidebar">
+        <div class="header">
+            <h1>Erzbistum Berlin</h1>
+            <p>Interactive map visualizing the extracted geographical boundaries of the Archdiocese of Berlin.</p>
+        </div>
+        
+        <div class="stats-container" id="stats">
+            <div class="stat-box">
+                <div class="stat-label">Total Subdistricts</div>
+                <div class="stat-value" id="stat-count">-</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Area Data</div>
+                <div class="stat-value" id="stat-area">Loading...</div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>📍 Add Custom Location</h3>
+            <form id="addLocationForm">
+                <div class="input-group">
+                    <label>Name</label>
+                    <input type="text" id="locName" placeholder="e.g. St. Hedwig's Cathedral" required>
+                </div>
+                <div class="input-group">
+                    <label>Address</label>
+                    <input type="text" id="locAddress" placeholder="e.g. Bebelplatz, 10117 Berlin" required>
+                </div>
+                <div class="input-group">
+                    <label>Tags (Comma separated)</label>
+                    <input type="text" id="locTags" placeholder="e.g. historic, church">
+                </div>
+                <button type="submit" id="submitBtn">Geocode & Save</button>
+                <div id="formFeedback" style="font-size: 0.85rem; margin-top: 12px; font-weight: 600; display: none;"></div>
+            </form>
+        </div>
+
+        <div class="filter-section">
+            <h3>Filter Locations by Tags</h3>
+            <div class="tags-container" id="filterTags">
+                <div style="font-size: 0.85rem; color: #64748b; width: 100%;">No tags available yet. Add a location above!</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    
+    <script>
+        const map = L.map('map', { zoomControl: false }).setView([52.5200, 13.4050], 7);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        // We DO NOT add the tileLayer here! Map is completely white by default.
+        let currentTileLayer = null;
+
+        Promise.all([
+            fetch('bistumberlin.geojson').then(res => res.json()).catch(() => null),
+            fetch('pfarreienberlinall.geojson').then(res => res.json()).catch(() => null)
+        ])
+        .then(([esriData, pfarreienData]) => {
+            let bounds = null;
+
+            // -- A: Mask the outside of the Diocese --
+            if (esriData && esriData.features) {
+                // Calculate the true bounds of the diocese to create a small, efficient mask
+                // instead of a massive world polygon that causes rendering fragments
+                const tempLayer = L.geoJSON({
+                    type: "Feature",
+                    geometry: { type: "Polygon", coordinates: esriData.features[0].geometry.rings }
+                });
+                const esriBounds = tempLayer.getBounds();
+                
+                // Outer padding just large enough to cover the screen bounds safely (pad by 5 degrees)
+                const outerBox = [
+                    [esriBounds.getNorth() + 5, esriBounds.getWest() - 5],
+                    [esriBounds.getNorth() + 5, esriBounds.getEast() + 5],
+                    [esriBounds.getSouth() - 5, esriBounds.getEast() + 5],
+                    [esriBounds.getSouth() - 5, esriBounds.getWest() - 5],
+                    [esriBounds.getNorth() + 5, esriBounds.getWest() - 5]
+                ];
+                
+                const maskCoordinates = [outerBox];
+                const borderCoordinates = [];
+                
+                esriData.features.forEach(f => {
+                    f.geometry.rings.forEach(ring => {
+                        const hole = ring.map(coord => [coord[1], coord[0]]);
+                        maskCoordinates.push(hole);
+                        borderCoordinates.push(ring);
+                    });
+                });
+
+                // Small efficient mask
+                L.polygon(maskCoordinates, {
+                    color: 'transparent',
+                    fillColor: '#ffffff',
+                    fillOpacity: 1,
+                    interactive: false
+                }).addTo(map);
+
+                // Neumorphic shadow casting layer
+                const shadowLayerGeojson = {
+                    type: "FeatureCollection",
+                    features: [{
+                        type: "Feature",
+                        geometry: { type: "Polygon", coordinates: borderCoordinates }
+                    }]
+                };
+
+                const shadowLayer = L.geoJSON(shadowLayerGeojson, {
+                    style: {
+                        fillColor: '#000', 
+                        fillOpacity: 1,
+                        stroke: false,
+                        className: 'neumorphic-shadow-layer'
+                    },
+                    interactive: false
+                }).addTo(map);
+
+                bounds = shadowLayer.getBounds();
+
+                const firstFeature = esriData.features[0];
+                const area = firstFeature.attributes.Shape_Area || firstFeature.attributes.shape_Area;
+                if (area && document.getElementById('stat-area').innerText === 'Loading...') {
+                    const areaKm2 = (area / 1000000).toLocaleString(undefined, { maximumFractionDigits: 2 });
+                    document.getElementById('stat-area').innerText = `${areaKm2} km²`;
+                }
+            }
+
+            // -- B: Draw Subdistricts (Pfarreien) --
+            if (pfarreienData && pfarreienData.features && pfarreienData.features.length > 0) {
+                let activeParishLayer = null;
+                let activeShadowLayer = null;
+
+                const subdistrictsLayer = L.geoJSON(pfarreienData, {
+                    style: function (feature) {
+                        return {
+                            color: '#e2e8f0',       // Fine grey lines
+                            weight: 1.5,              
+                            fillColor: '#ffffff',   // White by default
+                            fillOpacity: 1,         // Fully opaque (hides map)
+                            className: 'pfarrei-layer'
+                        };
+                    },
+                    onEachFeature: function (feature, layer) {
+                        const name = feature.properties.name || 'Unnamed Parish';
+                        layer.bindPopup(`<div><strong>${name}</strong><br><small>Parish</small></div>`);
+                        
+                        layer.on('mouseover', function (e) {
+                            if (activeParishLayer !== this) {
+                                this.setStyle({ color: '#cbd5e1', weight: 2 });
+                            }
+                        });
+                        
+                        layer.on('mouseout', function (e) {
+                            if (activeParishLayer !== this) {
+                                subdistrictsLayer.resetStyle(this);
+                            }
+                        });
+
+                        layer.on('click', function (e) {
+                            // Reset previous
+                            if (activeParishLayer) {
+                                subdistrictsLayer.resetStyle(activeParishLayer);
+                            }
+                            if (activeShadowLayer) {
+                                map.removeLayer(activeShadowLayer);
+                                activeShadowLayer = null;
+                            }
+                            
+                            activeParishLayer = this;
+                            
+                            // 1. Reveal map by making fill transparent, highlight border
+                            this.setStyle({ fillOpacity: 0, color: '#991b1b', weight: 3 });
+                            this.bringToFront();
+                            
+                            // 2. Create an exact clone underneath to cast the perfect OUTSIDE shadow
+                            // without casting a shadow inside the parish.
+                            activeShadowLayer = L.geoJSON(feature, {
+                                style: {
+                                    fillColor: '#000', // Solid color for SVG cutout filter
+                                    fillOpacity: 1,
+                                    stroke: false,
+                                    className: 'active-parish-shadow'
+                                },
+                                interactive: false
+                            }).addTo(map);
+
+                            // Bring the real layer on top of its shadow
+                            this.bringToFront();
+
+                            // 3. Performance BaseMap handling: Only load tiles for THIS parish's bounding box!
+                            if (currentTileLayer) {
+                                map.removeLayer(currentTileLayer);
+                            }
+                            currentTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+                                attribution: '&copy; CARTO',
+                                maxZoom: 20,
+                                bounds: this.getBounds() // MASSIVE performance boost + hides outside tiles
+                            }).addTo(map);
+                            currentTileLayer.setZIndex(0); // Ensure it stays at the very back
+
+                            // 4. Smooth Pan
+                            map.flyToBounds(this.getBounds(), { padding: [80, 80], duration: 1.0, easeLinearity: 0.25 });
+                        });
+                    }
+                }).addTo(map);
+                
+                document.getElementById('stat-count').innerText = `${pfarreienData.features.length}`;
+            }
+
+            if (bounds) map.fitBounds(bounds, { padding: [30, 30], animate: false });
+
+            setTimeout(() => {
+                const loader = document.getElementById('loading');
+                if (loader) {
+                    loader.style.opacity = '0';
+                    setTimeout(() => loader.remove(), 500);
+                }
+            }, 300);
+        })
+        .catch(error => {
+            console.error("Error loading data:", error);
+            document.getElementById('stat-count').innerText = "Error";
+            document.getElementById('stat-area').innerText = "Data failed";
+            const loader = document.getElementById('loading');
+            if (loader) loader.remove();
+        });
+
+        // --- 3. CUSTOM LOCATIONS LOGIC ---
+        let customLocations = [];
+        let activeFilterTags = new Set();
+        let markerLayerGroup = L.layerGroup().addTo(map);
+
+        function loadCustomLocations() {
+            fetch('locations.json')
+                .then(res => res.json())
+                .then(data => {
+                    customLocations = data || [];
+                    renderCustomLocations();
+                    renderTagFilters();
+                })
+                .catch(err => console.log("No custom locations."));
+        }
+
+        function renderCustomLocations() {
+            markerLayerGroup.clearLayers();
+            customLocations.forEach(loc => {
+                if (activeFilterTags.size > 0) {
+                    const locTags = loc.tags || [];
+                    const hasTag = locTags.some(t => activeFilterTags.has(t.toLowerCase()));
+                    if (!hasTag) return; 
+                }
+
+                const customIcon = L.divIcon({
+                    className: 'custom-marker',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10],
+                    popupAnchor: [0, -12]
+                });
+
+                const marker = L.marker([loc.lat, loc.lon], { icon: customIcon });
+                const tagsHtml = (loc.tags || []).map(t => `<span class="popup-tag">${t}</span>`).join('');
+
+                marker.bindPopup(`
+                    <div>
+                        <strong style="color: var(--text-main); font-size: 1.1rem;">${loc.name}</strong><br>
+                        <small style="color: var(--text-muted); display: block; margin: 4px 0;">${loc.address}</small>
+                        <div class="popup-tags">${tagsHtml}</div>
+                    </div>
+                `);
+                markerLayerGroup.addLayer(marker);
+            });
+        }
+
+        function renderTagFilters() {
+            const container = document.getElementById('filterTags');
+            const allTags = new Set();
+            customLocations.forEach(loc => {
+                if (loc.tags) loc.tags.forEach(t => allTags.add(t.toLowerCase()));
+            });
+
+            if (allTags.size === 0) return;
+            container.innerHTML = '';
+            
+            allTags.forEach(tag => {
+                const pill = document.createElement('div');
+                pill.className = `tag-pill ${activeFilterTags.has(tag) ? 'active' : ''}`;
+                pill.innerText = tag;
+                pill.onclick = () => {
+                    if (activeFilterTags.has(tag)) {
+                        activeFilterTags.delete(tag);
+                        pill.classList.remove('active');
+                    } else {
+                        activeFilterTags.add(tag);
+                        pill.classList.add('active');
+                    }
+                    renderCustomLocations();
+                };
+                container.appendChild(pill);
+            });
+        }
+
+        document.getElementById('addLocationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const feedback = document.getElementById('formFeedback');
+            
+            const name = document.getElementById('locName').value;
+            const address = document.getElementById('locAddress').value;
+            const tagsInput = document.getElementById('locTags').value;
+            const tags = tagsInput.split(',').map(t => t.trim()).filter(t => t.length > 0);
+
+            btn.disabled = true;
+            btn.innerText = "Geocoding...";
+            feedback.style.display = "none";
+
+            try {
+                const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
+                const geoRes = await fetch(nomUrl, { headers: { 'User-Agent': 'ErzbistumBerlinApp/1.0' }});
+                const geoData = await geoRes.json();
+
+                if (!geoData || geoData.length === 0) throw new Error("Address not found.");
+
+                const lat = parseFloat(geoData[0].lat);
+                const lon = parseFloat(geoData[0].lon);
+
+                btn.innerText = "Saving...";
+                const newLocation = { name, address, tags, lat, lon };
+                
+                const saveRes = await fetch('/api/locations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newLocation)
+                });
+
+                if (!saveRes.ok) throw new Error("Failed to save to server.");
+
+                customLocations.push(newLocation);
+                renderCustomLocations();
+                renderTagFilters();
+                
+                // If they add a location, ensure we can see it! 
+                // We'll load the full basemap just for this pan.
+                if (currentTileLayer) map.removeLayer(currentTileLayer);
+                currentTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
+                currentTileLayer.setZIndex(0);
+
+                map.flyTo([lat, lon], 14, { duration: 1.5 });
+
+                document.getElementById('addLocationForm').reset();
+                btn.innerText = "Geocode & Save";
+                btn.disabled = false;
+                
+                feedback.innerText = "✓ Location successfully added!";
+                feedback.style.color = "#059669";
+                feedback.style.display = "block";
+                setTimeout(() => feedback.style.display = "none", 4000);
+
+            } catch (err) {
+                btn.innerText = "Geocode & Save";
+                btn.disabled = false;
+                feedback.innerText = `✗ Error: ${err.message}`;
+                feedback.style.color = "var(--accent-red)";
+                feedback.style.display = "block";
+            }
+        });
+
+        loadCustomLocations();
+    </script>
+</body>
+</html>
