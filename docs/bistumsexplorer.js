@@ -1302,6 +1302,8 @@ return { setScope, setView, openAdmin, destroy() { try { if (map) map.remove(); 
 
 function mount(el, cfg) {
   cfg = cfg || {};
+  if (cfg.baseUrl) BX_BASE = cfg.baseUrl.replace(/\/?$/, '/');
+  if (!BX_BASE && BX_WORKER_FILE) { var sc = document.querySelector('script[src*="bistumsexplorer.js"]'); if (sc) BX_BASE = sc.src.replace(/[^\/]*$/, ''); }
   if (!document.querySelector('style[data-bx-fonts]')) { var f = document.createElement('style'); f.setAttribute('data-bx-fonts', ''); f.textContent = BX_FONTS; document.head.appendChild(f); }
   // everything lives in a shadow root: styles of the surrounding page cannot leak in, and ours cannot leak out
   var host = el.shadowRoot || el.attachShadow({ mode: 'open' });
@@ -1310,27 +1312,33 @@ function mount(el, cfg) {
   if (el.clientHeight < 80) el.style.height = cfg.height || '720px';
   return BX_START(host.querySelector('.bx'), cfg);
 }
-window.Bistumsexplorer = { mount: mount };
-// A plain element is enough to start it: <div data-bistumsexplorer data-height="720px" data-tiles="…" data-site="…" data-fullpage></div>
-function fromElement(el) {
-  if (el.__bx) return; el.__bx = true;
-  var d = el.dataset, cfg = Object.assign({}, window.BX_CONFIG);
-  if (d.tiles) cfg.tilesUrl = d.tiles.replace(/\/?$/, '/');
-  if (d.site) cfg.sharepoint = Object.assign({}, cfg.sharepoint, { siteUrl: d.site });
-  if (d.height) cfg.height = d.height;
-  var editing = function () { return /[?&]mode=edit/i.test(location.search); };
-  if (!('fullpage' in d) || editing()) { mount(el, cfg); return; }
-  // full page: the map covers the whole browser window, including the SharePoint interface around the web part
-  var host = document.createElement('div');
-  host.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:#fafafb';
-  document.body.appendChild(host);
-  var app = mount(host, cfg), href = location.href.split('#')[0];
-  var watch = setInterval(function () {   // SharePoint switches pages without reloading: leave when the page or its mode changes
-    if (el.isConnected && !editing() && location.href.split('#')[0] === href) return;
-    clearInterval(watch); app.destroy(); host.remove(); el.__bx = false;
-    if (el.isConnected) fromElement(el);
-  }, 600);
+/* placeholders written into a page: <div data-bistumsexplorer data-base="…/bistumsexplorer/" [data-height="720px"] [data-fullpage]></div> */
+function mountPlaceholder(ph) {
+  ph.setAttribute('data-bx-mounted', '');
+  var cfg = Object.assign({}, window.BX_CONFIG);
+  if (ph.getAttribute('data-base')) cfg.baseUrl = ph.getAttribute('data-base');
+  if (ph.getAttribute('data-tiles')) cfg.tilesUrl = ph.getAttribute('data-tiles');
+  if (ph.getAttribute('data-height')) cfg.height = ph.getAttribute('data-height');
+  if (ph.getAttribute('data-site')) cfg.sharepoint = Object.assign({}, cfg.sharepoint, { siteUrl: ph.getAttribute('data-site') });
+  var editing = /[?&]Mode=Edit/i.test(location.search);
+  if (!ph.hasAttribute('data-fullpage') || editing) {
+    if (ph.hasAttribute('data-fullpage')) cfg.height = '600px';   // while the page is being edited the map stays inside its web part
+    return mount(ph, cfg);
+  }
+  // full page: the map covers the whole window, including the surrounding page's own interface, until that page is left
+  var layer = document.createElement('div');
+  layer.setAttribute('data-bx-layer', '');
+  layer.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483000;background:#fafafb';
+  document.body.appendChild(layer);
+  var path = location.pathname, overflow = document.documentElement.style.overflow;
+  document.documentElement.style.overflow = 'hidden';
+  var watch = setInterval(function () {
+    if (ph.isConnected && location.pathname === path && !/[?&]Mode=Edit/i.test(location.search)) return;
+    clearInterval(watch); layer.remove(); document.documentElement.style.overflow = overflow; ph.removeAttribute('data-bx-mounted');
+  }, 400);
+  return mount(layer, cfg);
 }
-var all = document.querySelectorAll('[data-bistumsexplorer]');
-for (var i = 0; i < all.length; i++) fromElement(all[i]);
+function scan() { var all = document.querySelectorAll('[data-bistumsexplorer]:not([data-bx-mounted])'); for (var i = 0; i < all.length; i++) mountPlaceholder(all[i]); }
+window.Bistumsexplorer = { mount: mount, scan: scan };
+scan();
 })();
