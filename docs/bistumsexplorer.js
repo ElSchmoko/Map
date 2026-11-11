@@ -1296,7 +1296,7 @@ async function boot() {
 }
 const start = () => boot().catch(e => { $('#boot').textContent = 'Die Karte konnte nicht geladen werden.'; console.error(e); });
 if (document.fonts && document.fonts.load) Promise.race([document.fonts.load('500 12px Inter'), new Promise(r => setTimeout(r, 1200))]).then(start, start); else start();
-return { map, setScope, setView, openAdmin };
+return { setScope, setView, openAdmin, destroy() { try { if (map) map.remove(); } catch (e) {} map = null; } };
 }
 
 
@@ -1311,6 +1311,26 @@ function mount(el, cfg) {
   return BX_START(host.querySelector('.bx'), cfg);
 }
 window.Bistumsexplorer = { mount: mount };
-var auto = document.querySelector('[data-bistumsexplorer]');
-if (auto) mount(auto, window.BX_CONFIG);
+// A plain element is enough to start it: <div data-bistumsexplorer data-height="720px" data-tiles="…" data-site="…" data-fullpage></div>
+function fromElement(el) {
+  if (el.__bx) return; el.__bx = true;
+  var d = el.dataset, cfg = Object.assign({}, window.BX_CONFIG);
+  if (d.tiles) cfg.tilesUrl = d.tiles.replace(/\/?$/, '/');
+  if (d.site) cfg.sharepoint = Object.assign({}, cfg.sharepoint, { siteUrl: d.site });
+  if (d.height) cfg.height = d.height;
+  var editing = function () { return /[?&]mode=edit/i.test(location.search); };
+  if (!('fullpage' in d) || editing()) { mount(el, cfg); return; }
+  // full page: the map covers the whole browser window, including the SharePoint interface around the web part
+  var host = document.createElement('div');
+  host.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:#fafafb';
+  document.body.appendChild(host);
+  var app = mount(host, cfg), href = location.href.split('#')[0];
+  var watch = setInterval(function () {   // SharePoint switches pages without reloading: leave when the page or its mode changes
+    if (el.isConnected && !editing() && location.href.split('#')[0] === href) return;
+    clearInterval(watch); app.destroy(); host.remove(); el.__bx = false;
+    if (el.isConnected) fromElement(el);
+  }, 600);
+}
+var all = document.querySelectorAll('[data-bistumsexplorer]');
+for (var i = 0; i < all.length; i++) fromElement(all[i]);
 })();
