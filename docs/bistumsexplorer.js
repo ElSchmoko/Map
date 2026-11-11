@@ -1334,9 +1334,11 @@ function mountPlaceholder(ph) {
   document.documentElement.style.overflow = 'hidden';
   var watch = setInterval(function () {
     if (ph.isConnected && location.pathname === path && !/[?&]Mode=Edit/i.test(location.search)) return;
-    clearInterval(watch); layer.remove(); document.documentElement.style.overflow = overflow; ph.removeAttribute('data-bx-mounted');
+    clearInterval(watch); try { app.destroy(); } catch (e) {} layer.remove(); document.documentElement.style.overflow = overflow; ph.removeAttribute('data-bx-mounted');
+    if (ph.isConnected && location.pathname === path) mountPlaceholder(ph);   // same page, now in edit mode: continue inside the web part
   }, 400);
-  return mount(layer, cfg);
+  var app = mount(layer, cfg);
+  return app;
 }
 function scan() { var all = document.querySelectorAll('[data-bistumsexplorer]:not([data-bx-mounted])'); for (var i = 0; i < all.length; i++) mountPlaceholder(all[i]); }
 window.Bistumsexplorer = { mount: mount, scan: scan };
