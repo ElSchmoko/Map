@@ -117,7 +117,7 @@ const CAT_ICON = {
 };
 for (const k in CAT_ICON) CAT_ICON[k] = CAT_ICON[k].replace(/(\.\d*?[1-9])0+\b/g, '$1').replace(/\.0+\b/g, '');
 // icon for a category: by its key, otherwise by words in its name (categories from the list are free text)
-const ICON_WORDS = [['bezirksbeauftrag', 'bezirk'], ['sucht', 'sucht'], ['mental', 'krisen'], ['psych', 'krisen'], ['krise', 'krisen'], ['wohnungslos', 'wohnungsnot'], ['wohnungsnot', 'wohnungsnot'],
+const ICON_WORDS = [['bezirksbeauftrag', 'bezirk'], ['sucht', 'sucht'], ['mental', 'krisen'], ['suizid', 'krisen'], ['psych', 'krisen'], ['krise', 'krisen'], ['wohnungslos', 'wohnungsnot'], ['wohnungsnot', 'wohnungsnot'],
   ['existenz', 'carisatt'], ['carisatt', 'carisatt'], ['migration', 'migration'], ['flucht', 'migration'], ['schwanger', 'schwanger'], ['frauen', 'frauen'], ['kinderschutz', 'kinderschutz'],
   ['kinder', 'familie'], ['familie', 'familie'], ['jugend', 'familie'], ['schuld', 'schulden'], ['insolvenz', 'schulden'], ['hospiz', 'hospiz'], ['vormund', 'vormundschaft'], ['betreuung', 'betreuungen'],
   ['adoption', 'adoption'], ['kita', 'kitas'], ['pflege', 'alter'], ['alter', 'alter'], ['behinder', 'behinderungen'], ['stromspar', 'stromspar'], ['beratung', 'asb']];
@@ -275,7 +275,11 @@ const Store = {
       catch (e) { await this.sp('/_api/web/lists', { method: 'POST', body: JSON.stringify({ Title: title, BaseTemplate: 100 }) }); }
       const have = (await this.sp(this.list(title) + '/fields?$select=InternalName')).value.map(f => f.InternalName);
       for (const [n, type, extra] of fields) if (!have.includes(n))
-        await this.sp(this.list(title) + '/fields/createfieldasxml', { method: 'POST', body: JSON.stringify({ parameters: { SchemaXml: `<Field Type="${type}" Name="${n}" StaticName="${n}" DisplayName="${n}" ${extra || ''}/>`, Options: 8 } }) });
+        await this.sp(this.list(title) + '/fields/createfieldasxml', { method: 'POST', body: JSON.stringify({ parameters: { SchemaXml: `<Field Type="${type}" Name="${n}" StaticName="${n}" DisplayName="${n}" ${extra || ''}/>`, Options: 24 } }) });
+      try {   // show every column in the list's default view, also for columns made by an earlier version
+        const shownCols = (await this.sp(this.list(title) + '/DefaultView/ViewFields')).Items || [];
+        for (const [n] of fields) if (!shownCols.includes(n)) await this.sp(this.list(title) + "/DefaultView/ViewFields/addviewfield('" + n + "')", { method: 'POST' });
+      } catch (e) {}
     };
     await mk(this.cfg.locationsList, SP_FIELDS);
     await mk(this.cfg.settingsList, [['Wert', 'Note', 'RichText="FALSE" NumLines="20"']]);
