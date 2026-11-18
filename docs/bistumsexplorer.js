@@ -180,7 +180,7 @@ const LS = { get(k, d) { try { const v = localStorage.getItem(k); return v ? JSO
              del(k) { try { localStorage.removeItem(k); } catch (e) {} } };
 
 const Store = {
-  mode: 'local', error: '', canEdit: true,
+  mode: 'local', error: '', canEdit: false, isEditor: false,
   cfg: Object.assign({}, CONFIG.sharepoint, LS.get('bx.sp', {})),
   siteUrl() {
     if (this.cfg.siteUrl) return this.cfg.siteUrl.replace(/\/$/, '');
@@ -220,13 +220,17 @@ const Store = {
     return it;
   },
   async init() {
-    this.mode = 'local'; this.error = '';
+    this.mode = 'local'; this.error = ''; this.isEditor = false; this.canEdit = false;
     if (!this.siteUrl()) return;
+    try {   // Verwaltung is for people who can edit the SharePoint site (members with "Bearbeiten", owners); anything unclear counts as no
+      const w = await this.sp('/_api/web/EffectiveBasePermissions');
+      this.isEditor = !!(w && w.Low != null && (Number(w.Low) & 4) !== 0);   // EditListItems
+    } catch (e) { this.isEditor = false; }
     try {
       const j = await this.sp(this.list(this.cfg.locationsList) + '?$select=Id,EffectiveBasePermissions'); this.mode = 'sharepoint';
       try { this.fields = new Set((await this.sp(this.list(this.cfg.locationsList) + '/fields?$select=InternalName')).value.map(f => f.InternalName)); } catch (e) { this.fields = null; }
       const low = j && j.EffectiveBasePermissions ? Number(j.EffectiveBasePermissions.Low) : NaN;
-      this.canEdit = isNaN(low) ? true : (low & 4) !== 0;   // EditListItems
+      this.canEdit = !isNaN(low) && (low & 4) !== 0;   // EditListItems on the list itself
     }
     catch (e) { this.error = e.message; }
   },
@@ -1069,7 +1073,8 @@ $('#qclr').addEventListener('click', () => { q.value = ''; runSearch(); q.focus(
 /* ------------------------------------------------------------------ admin */
 const adm = $('#adm');
 let admTab = 'loc', editing = null, picking = null, admQ = '';
-function openAdmin() { closeSheet(); closeCard(true); adm.classList.add('on'); renderAdmin(); }
+const mayAdmin = () => !!CONFIG.adminEnabled && (Store.isEditor || (Store.mode !== 'sharepoint' && CONFIG.adminLocal === true));
+function openAdmin() { if (!mayAdmin()) return; closeSheet(); closeCard(true); adm.classList.add('on'); renderAdmin(); }
 function closeAdmin() { adm.classList.remove('on'); editing = null; }
 function renderAdmin() {
   if (admTab === 'imp' && !adm.classList.contains('on')) admTab = 'loc';
@@ -1489,7 +1494,7 @@ async function boot() {
     refit(); renderCats(); applyStage();
     const c0 = camFor(bb); if (c0) map.jumpTo(c0);
     $('#boot').classList.add('done'); intro();
-    if (location.hash === '#verwaltung' && CONFIG.adminEnabled && (Store.mode !== 'sharepoint' || Store.canEdit)) openAdmin();
+    if (location.hash === '#verwaltung') openAdmin();
   });
   map.on('move', () => { if (cardLoc) placeCard(); });
   map.on('moveend', e => { if (e.originalEvent || e.user) onUserMoveEnd(); });
@@ -1506,7 +1511,7 @@ async function boot() {
   root.querySelectorAll('#ptabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
   setTab('cats');
   $('#admbtn').addEventListener('click', openAdmin);
-  if (!CONFIG.adminEnabled || (Store.mode === 'sharepoint' && !Store.canEdit)) $('#admbtn').style.display = 'none';
+  if (!mayAdmin()) $('#admbtn').remove();
   // link to the data explorer draft: next to the page where plain HTML files open, otherwise only if an address is configured
   const onSp = /\.sharepoint\.(com|de)$/.test(location.hostname);
   const dxUrl = CONFIG.dataExplorerUrl != null ? CONFIG.dataExplorerUrl : (typeof BX_DX_URL === 'string' && BX_DX_URL) || (onSp || location.protocol === 'file:' ? '' : (typeof BX_BASE === 'string' ? BX_BASE : '') + 'datenexplorer.html');
