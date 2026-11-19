@@ -847,7 +847,7 @@ card.addEventListener('mouseleave', () => { if (!S.sticky) leaveT = setTimeout((
 const addrLine = l => [l.street, [l.zip, l.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
 function routeHref(l) {   // the address alone finds the place most reliably; demo entries use their coordinates
   const a = addrLine(l);
-  return 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(l.demo || !a ? l.lat + ',' + l.lng : a);
+  return 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(l.demo || !l.street ? l.lat + ',' + l.lng : a);   // without a street, the pin itself
 }
 function contactRows(l) {
   const rows = [];
